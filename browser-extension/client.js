@@ -1,4 +1,4 @@
-// New Version
+// Working
 let selected_pins = new Map();
 let observer_running = false;
 let observer;
@@ -17,6 +17,16 @@ let endless_mode_active = false;
 let endless_batch_size = 100; // Download every N pins
 let endless_total_downloaded = 0;
 let endless_is_downloading = false; // Guard to prevent overlapping batch triggers
+
+// Marquee Variables
+let is_marquee_selecting = false;
+let start_marquee_x = 0;
+let start_marquee_y = 0;
+let current_marquee_x = 0;
+let current_marquee_y = 0;
+let marquee_div = null;
+let did_marquee_drag = false;
+let marquee_raf = null;
 
 let current_board_url = '';
 let url_change_observer = null;
@@ -63,7 +73,7 @@ let message_template = {
     endless_stop: 'Endless Mode Stopped.'
 };
 
-const progress_logs =['cc_log', 'cc_warning', 'cc_error', 'cc_success'];
+const progress_logs = ['cc_log', 'cc_warning', 'cc_error', 'cc_success'];
 function logger(level, message, context = {}) {
     const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
     const logMessage = `[PBDL - ${timestamp}] [${level}] ${message}`;
@@ -271,7 +281,7 @@ function initialize_full_ui() {
     <svg id="cc_close_btn" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.5 7.5L13.5 13.5M13.5 7.5L7.5 13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
     <section id="cc_section_1">
         <header id="branding"><svg id="cc_pinterest_icon" viewBox="0 0 12 13" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_214_217)"><rect y="0.5" width="12" height="12" rx="6" fill="#E9E9E9" /><path d="M3.77 12.075C3.70334 11.3917 3.74667 10.7367 3.9 10.11L4.5 7.52C4.38997 7.18576 4.33097 6.83684 4.325 6.485C4.325 5.645 4.73 5.045 5.37 5.045C5.81 5.045 6.135 5.355 6.135 5.945C6.135 6.135 6.09667 6.34833 6.02 6.585L5.76 7.445C5.71 7.61167 5.685 7.765 5.685 7.905C5.685 8.505 6.14 8.84 6.725 8.84C7.77 8.84 8.51 7.76 8.51 6.36C8.51 4.8 7.49 3.8 5.985 3.8C4.305 3.8 3.24 4.895 3.24 6.42C3.24 7.03 3.43 7.6 3.795 7.99C3.675 8.195 3.545 8.23 3.355 8.23C2.755 8.23 2.185 7.385 2.185 6.23C2.185 4.23 3.785 2.645 6.025 2.645C8.375 2.645 9.855 4.29 9.855 6.31C9.855 8.33 8.415 9.885 6.865 9.885C6.57003 9.88889 6.27821 9.82405 6.01265 9.69561C5.74709 9.56717 5.51508 9.37865 5.335 9.145L5.025 10.395C4.86976 11.0511 4.5952 11.6732 4.215 12.23C5.11334 12.5122 6.06554 12.5786 6.99435 12.4239C7.92316 12.2691 8.8024 11.8976 9.56075 11.3394C10.3191 10.7813 10.9352 10.0522 11.359 9.21135C11.7828 8.37051 12.0024 7.44161 12 6.5C12 4.9087 11.3679 3.38258 10.2426 2.25736C9.11742 1.13214 7.5913 0.5 6 0.5C4.4087 0.5 2.88258 1.13214 1.75736 2.25736C0.632143 3.38258 1.92232e-06 4.9087 1.92232e-06 6.5C-0.00095816 7.69967 0.35773 8.87208 1.02975 9.86585C1.70177 10.8596 2.65627 11.6291 3.77 12.075Z" fill="#BD081C" /></g><defs><clipPath id="clip0_214_217"><rect y="0.5" width="12" height="12" rx="6" fill="white" /></clipPath></defs></svg><h1 id="cc_branding_name">Pinterest Board Downloader</h1></header>
-        <p id="cc_manual"><b>Right Click + Shift</b> to select/deselect pins. Avoid closing the tab or opening pins while downloading. Hope you find this tool helpful!</p>
+        <p id="cc_manual"><b>Shift + Right Click</b> to select a single pin. <b>Shift + Right Drag</b> to marquee select pins (hold Alt to unselect). Avoid closing the tab or opening pins while downloading.</p>
         <div id="cc_controls_wrapper"><div id="cc_selected_pins_wrapper" class="cc_single_control_wrapper"><h1 id="cc_currently_selected_pins_count_elem" class="cc_count_display">0</h1><p>Selected Pins</p><a id="cc_download_selected_pins_elem" class="cc_download_btn">Download</a></div><div class="cc_v_separator"></div><div id="cc_board_count_wrapper" class="cc_single_control_wrapper"><h1 id="cc_current_board_count_elem" class="cc_count_display">N/A</h1><p>Pins on Board</p><a id="cc_download_all_pins_elem" class="cc_download_btn">Download All</a></div><div class="cc_v_separator"></div><div id="cc_select_all_visible_pins_wrapper" class="cc_single_control_wrapper"><h1 id="cc_select_all_visible_pins_elem">Select Visible</h1></div></div>
     </section>
     <section id="cc_section_2"><div id="cc_log_wrapper"><p>Progress Log:</p><h1 id="cc_progress_log_elem">No logs to view right now.</h1></div></section>
@@ -320,6 +330,10 @@ function initialize_full_ui() {
     document.addEventListener('scroll', mark_visible_pins_only);
     document.addEventListener('drop', mark_visible_pins_only);
     window.addEventListener('resize', mark_visible_pins_only);
+
+    document.addEventListener('mousedown', handle_marquee_start);
+    document.addEventListener('mousemove', handle_marquee_move);
+    document.addEventListener('mouseup', handle_marquee_end);
 
     document.body.style.userSelect = 'none';
     DOM.downloader_button.self.classList.add('cc_hidden');
@@ -455,7 +469,7 @@ async function run_endless_loop() {
             if (record.type !== 'childList') continue;
             for (let node of record.addedNodes) {
                 if (node.nodeType !== Node.ELEMENT_NODE) continue;
-                
+
                 let anchors = Array.from(node.querySelectorAll('a[href*="/pin/"]'));
                 // Catch the node itself if it's the anchor 
                 if (node.tagName === 'A' && node.href && node.href.includes('/pin/')) {
@@ -476,16 +490,16 @@ async function run_endless_loop() {
                         let img = pin_element.querySelector('img');
                         let img_srcset = img?.srcset || img?.src || '';
                         let image_url = img_srcset ? parse_srcset(img_srcset, true) : '';
-                        
+
                         if (image_url) {
                             image_url = image_url.replace(/\/[\d]+x\//, '/originals/');
                         }
-                        
+
                         let has_video = !!pin_element.querySelector('video');
 
                         selected_pins.set(url, { url, image_url, video_url: '', has_video });
                         found_new = true;
-                        
+
                         // Inject visual highlight
                         let overlay_host = pin_element.querySelector('a[href*="/pin/"]') || pin_element.querySelector('[data-test-id="visual-content-container"]');
                         if (overlay_host) {
@@ -513,7 +527,7 @@ async function run_endless_loop() {
             await populate_metadata_for_endless_batch();
 
             // DOWNLOAD BATCH
-            const batch_items =[];
+            const batch_items = [];
             for (const pin of selected_pins.values()) {
                 if (pin.video_url) batch_items.push({ media_url: pin.video_url, pin_url: pin.url });
                 else if (pin.image_url) batch_items.push({ media_url: pin.image_url, pin_url: pin.url });
@@ -663,7 +677,7 @@ function mark_visible_pins_only() {
     let visible_links = Array.from(document.querySelectorAll('[data-test-id="pin"] a[href*="/pin/"]'))
         .map(a => a.href)
         .filter(Boolean);
-        
+
     if (document.querySelector('[data-test-id="closeup-visual-container"]')) {
         visible_links.push(window.location.href);
     }
@@ -675,7 +689,7 @@ function mark_visible_pins_only() {
         if (downloaded_pins.has(url)) status = 'downloaded';
         else if (failed_pins.has(url)) status = 'failed';
         else if (selected_pins.has(url)) status = 'selected';
-        
+
         const pin_element = get_pin_element_by_url(url);
         if (!pin_element) continue;
 
@@ -694,6 +708,13 @@ function mark_visible_pins_only() {
 async function handle_click(event) {
     if (event.shiftKey) {
         event.preventDefault();
+
+        // Skip single-pin selection if we just finished dragging the marquee
+        if (did_marquee_drag) {
+            did_marquee_drag = false;
+            return;
+        }
+
         const element_below = document.elementFromPoint(event.clientX, event.clientY);
         if (!element_below) return;
 
@@ -722,6 +743,130 @@ async function handle_click(event) {
         }
     }
 }
+
+function handle_marquee_start(e) {
+    if (e.shiftKey && e.button === 2) {
+        if (DOM.full_ui_wrapper.self && DOM.full_ui_wrapper.self.contains(e.target)) return;
+
+        is_marquee_selecting = true;
+        did_marquee_drag = false;
+        start_marquee_x = e.clientX;
+        start_marquee_y = e.clientY;
+
+        marquee_div = document.createElement('div');
+        marquee_div.id = 'cc_marquee_overlay';
+        marquee_div.style.position = 'fixed';
+        marquee_div.style.border = '1px solid var(--cc_accent_1)';
+        marquee_div.style.backgroundColor = 'var(--cc_bg_accent_2)';
+        marquee_div.style.zIndex = '999999';
+        marquee_div.style.pointerEvents = 'none';
+
+        // --- UPDATED PORTION ---
+        marquee_div.style.willChange = 'transform, width, height'; // Optimize performance
+        marquee_div.style.left = '0px';
+        marquee_div.style.top = '0px';
+        marquee_div.style.transform = `translate(${start_marquee_x}px, ${start_marquee_y}px)`;
+        // -----------------------
+
+        marquee_div.style.width = '0px';
+        marquee_div.style.height = '0px';
+
+        document.body.appendChild(marquee_div);
+    }
+}
+
+function handle_marquee_move(e) {
+    if (!is_marquee_selecting || !marquee_div) return;
+
+    // Prevent native drag actions from ruining the marquee process
+    e.preventDefault();
+
+    current_marquee_x = e.clientX;
+    current_marquee_y = e.clientY;
+
+    // Only queue a layout update if one isn't already waiting
+    if (!marquee_raf) {
+        marquee_raf = requestAnimationFrame(() => {
+            let x = Math.min(start_marquee_x, current_marquee_x);
+            let y = Math.min(start_marquee_y, current_marquee_y);
+            let w = Math.abs(current_marquee_x - start_marquee_x);
+            let h = Math.abs(current_marquee_y - start_marquee_y);
+
+            // If the mouse actually moves a bit, register it as a drag
+            if (w > 5 || h > 5) did_marquee_drag = true;
+
+            // Use GPU-accelerated translate instead of top/left
+            marquee_div.style.transform = `translate(${x}px, ${y}px)`;
+            marquee_div.style.width = w + 'px';
+            marquee_div.style.height = h + 'px';
+
+            marquee_raf = null; // Clear the lock allowing the next frame to trigger
+        });
+    }
+}
+
+function capture_marquee_click(e) {
+    e.preventDefault();
+    e.stopPropagation();
+}
+
+function handle_marquee_end(e) {
+    if (is_marquee_selecting) {
+        is_marquee_selecting = false;
+
+        if (marquee_raf) {
+            cancelAnimationFrame(marquee_raf);
+            marquee_raf = null;
+        }
+
+        if (marquee_div) {
+            let rect = marquee_div.getBoundingClientRect();
+            marquee_div.remove();
+            marquee_div = null;
+
+            // Apply only if the selection drag box was sufficiently large
+            if (rect.width > 5 && rect.height > 5) {
+                // Prevent underlying link triggers right after drag completion
+                window.addEventListener('click', capture_marquee_click, { capture: true, once: true });
+                setTimeout(() => window.removeEventListener('click', capture_marquee_click, { capture: true }), 0);
+
+                let pin_elements = document.querySelectorAll('[data-test-id="pin"]');
+                let pins_to_select = [];
+                let pins_to_unselect = [];
+
+                for (let pin of pin_elements) {
+                    let pin_rect = pin.getBoundingClientRect();
+                    let intersect = !(
+                        rect.right < pin_rect.left ||
+                        rect.left > pin_rect.right ||
+                        rect.bottom < pin_rect.top ||
+                        rect.top > pin_rect.bottom
+                    );
+                    if (intersect) {
+                        let link = pin.querySelector('a[href*="/pin/"]');
+                        if (link && link.href) {
+                            if (e.altKey) {
+                                pins_to_unselect.push(link.href);
+                            } else {
+                                pins_to_select.push(link.href);
+                            }
+                        }
+                    }
+                }
+
+                if (pins_to_select.length > 0) {
+                    logger('INFO', `Marquee selected ${pins_to_select.length} pins.`);
+                    select_pins(pins_to_select);
+                }
+                if (pins_to_unselect.length > 0) {
+                    logger('INFO', `Marquee unselected ${pins_to_unselect.length} pins.`);
+                    unselect_pins(pins_to_unselect);
+                }
+            }
+        }
+    }
+}
+
 
 async function extract_board_pins(pin_count) {
     // Check if we're on a board page
@@ -912,9 +1057,9 @@ async function get_video_url_from_pin_page(pin_slug) {
 
         if (pinData.story_pin_data) {
             logger('DEBUG', `Detected Story Pin format for ${pin_id}`);
-            const pages = pinData.story_pin_data.pages ||[];
+            const pages = pinData.story_pin_data.pages || [];
             for (const page of pages) {
-                const blocks = page.blocks ||[];
+                const blocks = page.blocks || [];
                 const videoBlock = blocks.find(b => b.type === 'story_pin_video_block');
                 if (videoBlock?.video?.video_list) {
                     video_list = videoBlock.video.video_list;
@@ -927,7 +1072,7 @@ async function get_video_url_from_pin_page(pin_slug) {
         }
 
         if (video_list) {
-            const quality_order =['V_720P', 'V_1080P', 'V_480P', 'V_240P'];
+            const quality_order = ['V_720P', 'V_1080P', 'V_480P', 'V_240P'];
             for (const quality of quality_order) {
                 if (video_list[quality] && video_list[quality].url && video_list[quality].url.includes('.mp4')) {
                     logger('INFO', `Found best available video quality for ${pin_id}: ${quality}`);
@@ -979,7 +1124,7 @@ async function initialize_downloads() {
         await Promise.all(video_promises);
     }
 
-    const download_items =[];
+    const download_items = [];
     for (const pin of selected_pins.values()) {
         const should_download = !stateful_mode || !downloaded_pins.has(pin.url);
         if (should_download) {
@@ -1232,7 +1377,7 @@ async function download_pins(items) {
     let failed_downloads = 0;
     let successful_downloads = 0;
 
-    const chunks =[];
+    const chunks = [];
     for (let i = 0; i < items.length; i += MAX_CONCURRENT_DOWNLOADS) {
         chunks.push(items.slice(i, i + MAX_CONCURRENT_DOWNLOADS));
     }
@@ -1491,6 +1636,10 @@ function close_full_ui() {
     document.removeEventListener('scroll', mark_visible_pins_only);
     document.removeEventListener('drop', mark_visible_pins_only);
     window.removeEventListener('resize', mark_visible_pins_only);
+
+    document.removeEventListener('mousedown', handle_marquee_start);
+    document.removeEventListener('mousemove', handle_marquee_move);
+    document.removeEventListener('mouseup', handle_marquee_end);
 
     clearInterval(timeout_watcher_interval);
     clearInterval(auto_scroll_interval);
