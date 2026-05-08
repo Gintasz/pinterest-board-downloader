@@ -19,6 +19,7 @@ This extension simplifies downloading images from Pinterest with powerful, user-
 *   **Improved Memory Management**: Prevents slowdowns during long downloads by clearing old pins.
 *   **Image Downloads Only**: Focuses solely on downloading images for a fast and efficient solution.
 *   **Endless Mode**: Endless Mode makes the Pinterest Board Downloader fully automatic: it endlessly scrolls, loads, selects, and downloads pins in batches forever—no manual clicks needed. Ideal for massive or growing boards. Stop anytime with one click.
+*   **Marquee Over Pins To Select**: Shift + Right Clck to marquee/select multiple items (Shift + Alt + Right Clck to unselect).
 
 ## How to Install (Chrome & Edge)
 
@@ -51,3 +52,7 @@ Want to pick and choose? Here's how:
 *   **Select/Deselect Pins**: Hold down the `ShiftKey` + `rightClick` on any pin to select it. Right-clicking again (while holding shift) will deselect it.
 *   **Download Selected**: Once you've selected your pins, click the first download button.
 *   **Select All Visible**: Use the "Select All Visible Pins" button to bulk select currently visible pins.
+
+### Marquee Over Pins To Select
+
+![Hero](./readme-assets/image.png)
