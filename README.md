@@ -55,4 +55,5 @@ Want to pick and choose? Here's how:
 
 ### Marquee Over Pins To Select
 `Shift + Right Clck` to marquee/select multiple items (`Shift + Alt + Right Clck` to unselect).
+
 ![Hero](./readme-assets/image.png)
