@@ -1,4 +1,4 @@
-// Working
+// Working (marquee fix)
 let selected_pins = new Map();
 let observer_running = false;
 let observer;
@@ -134,9 +134,21 @@ function inject_global_styles() {
     }
 }
 
+function load_gsap() {
+    return new Promise((resolve) => {
+        if (window.gsap) { resolve(); return; }
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js';
+        script.onload = resolve;
+        script.onerror = resolve; // fallback gracefully if blocked
+        document.head.appendChild(script);
+    });
+}
+
 async function initialize() {
     logger('INFO', 'Pinterest Board Downloader is activating...');
     inject_global_styles();
+    await load_gsap();
 
     const stored_pins = localStorage.getItem('downloaded_pins');
     if (stored_pins) {
@@ -147,64 +159,41 @@ async function initialize() {
     setup_url_change_detection();
     let downloader_button = html_to_element(`<div id="cc_enable_downloader">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
         div#cc_enable_downloader {
-            --cc_fg_main: #333333;
-            --cc_fg_sec: #555555;
-            --cc_bg_main: #FFFFFF;
-            --cc_border: #E0E0E0;
-            --cc_accent_1: #007BFF;
-            --cc_accent_2: #0056b3;
-            --cc_bg_accent_2: rgba(0, 123, 255, 0.4);
-            --cc_success: #28a745;
-            --cc_warning: #E8A600;
-            --cc_bg_accent_warning: rgba(232, 166, 0, 0.4);
-            --cc_error: #dc3545;
-            --cc_fz_9px: clamp(10px, 0.468vw, 12px);
-            --cc_fz_12px: clamp(12px, 0.625vw, 15px);
-            --cc_fz_16px: clamp(14px, 0.833vw, 18px);
-            --cc_fz_24px: clamp(20px, 1.25vw, 28px);
-            --cc_fz_40px: clamp(32px, 2.083vw, 48px);
+            box-sizing: border-box;
+            display: flex; gap: 0.8rem; align-items: center; padding: 0.8rem 1rem;
+            width: 480px !important;
+            max-width: 90vw;
+            inline-size: unset;
+            font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500;
+            color: var(--cc_fg_main);
+            background: rgba(235, 235, 235, 0.6);
+            backdrop-filter: blur(60px) saturate(200%) brightness(1.1);
+            -webkit-backdrop-filter: blur(60px) saturate(200%) brightness(1.1);
+            border: 1px solid var(--cc_fg_tert);
+            box-shadow: 0 -8px 32px rgba(0,0,0,0.12);
+            position: fixed; left: 50%; transform: translateX(-50%); bottom: 0;
+            border-radius: 12px 12px 0 0; cursor: pointer; z-index: 999999;
+            overflow: hidden;
         }
-        .cc_log { color: var(--cc_fg_main) !Important; }
-        .cc_warning { color: var(--cc_warning) !Important; }
-        .cc_error { color: var(--cc_error) !Important; }
-        .cc_success { color: var(--cc_success) !Important; }
-        .cc_visible { visibility: visible !Important; }
-        .cc_hidden { visibility: hidden !Important; }
-        div#cc_enable_downloader,
-        div#cc_enable_downloader * {
-            padding: 0; margin: 0; box-sizing: border-box; user-select: none; transition: all 250ms ease-in-out;
+        div#cc_enable_downloader::before {
+            content: '';
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23g)'/%3E%3C/svg%3E");
+            background-size: 300px 300px;
+            background-repeat: repeat;
+            opacity: 0.55;
+            pointer-events: none;
+            z-index: 0;
+            mix-blend-mode: soft-light;
         }
-        div#cc_enable_downloader {
-            display: flex; gap: 1rem; justify-content: center; align-items: center; padding: 1rem 1.2rem;
-            inline-size: fit-content; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            font-size: var(--cc_fz_16px); font-weight: 400; color: var(--cc_fg_main); background-color: var(--cc_bg_main);
-            border: 1px solid var(--cc_border); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); position: fixed;
-            left: calc(72px + 0.8rem); bottom: 1.5rem; cursor: pointer; z-index: 999999;
-        }
-        div#cc_enable_downloader:hover {
-            border-color: var(--cc_accent_1); transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
-        }
-        div#cc_enable_downloader:active {
-            transform: translateY(0); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
-        div#cc_enable_downloader #cc_downloader_pinterest_logo {
-            width: var(--cc_fz_24px); height: var(--cc_fz_24px);
-        }
-        div#cc_enable_downloader h2 {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            font-size: var(--cc_fz_16px); font-weight: 400; inline-size: fit-content; color: var(--cc_fg_main);
-        }
-        @media (max-width: 768px) {
-            div#cc_enable_downloader {
-                left: 50% !important;
-                transform: translateX(-50%);
-            }
-        }
+        div#cc_enable_downloader > * { position: relative; z-index: 1; }
+        div#cc_enable_downloader:hover { border-color: var(--cc_accent_1); }
+        div#cc_enable_downloader h2 { font-size: 13px; font-weight: 600; color: var(--cc_fg_main); margin: 0; }
+        .cc_hidden { visibility: hidden !important; }
     </style>
-    <svg id="cc_downloader_pinterest_logo" viewBox="0 0 30 31" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_209_463)"><rect y="0.5" width="30" height="30" rx="15" fill="#E9E9E9" /><path d="M9.425 29.4375C9.25834 27.7292 9.36667 26.0917 9.75 24.525L11.25 18.05C10.9749 17.2144 10.8274 16.3421 10.8125 15.4625C10.8125 13.3625 11.825 11.8625 13.425 11.8625C14.525 11.8625 15.3375 12.6375 15.3375 14.1125C15.3375 14.5875 15.2417 15.1208 15.05 15.7125L14.4 17.8625C14.275 18.2792 14.2125 18.6625 14.2125 19.0125C14.2125 20.5125 15.35 21.35 16.8125 21.35C19.425 21.35 21.275 18.65 21.275 15.15C21.275 11.25 18.725 8.75 14.9625 8.75C10.7625 8.75 8.10001 11.4875 8.10001 15.3C8.10001 16.825 8.575 18.25 9.4875 19.225C9.1875 19.7375 8.8625 19.825 8.3875 19.825C6.8875 19.825 5.4625 17.7125 5.4625 14.825C5.4625 9.825 9.46251 5.8625 15.0625 5.8625C20.9375 5.8625 24.6375 9.975 24.6375 15.025C24.6375 20.075 21.0375 23.9625 17.1625 23.9625C16.4251 23.9722 15.6955 23.8101 15.0316 23.489C14.3677 23.1679 13.7877 22.6966 13.3375 22.1125L12.5625 25.2375C12.1744 26.8779 11.488 28.4329 10.5375 29.825C12.7833 30.5304 15.1639 30.6965 17.4859 30.3096C19.8079 29.9228 22.006 28.994 23.9019 27.5986C25.7977 26.2032 27.3379 24.3805 28.3974 22.2784C29.457 20.1763 30.006 17.854 30 15.5C30 11.5218 28.4197 7.70644 25.6066 4.8934C22.7936 2.08035 18.9783 0.5 15 0.5C11.0218 0.5 7.20645 2.08035 4.3934 4.8934C1.58036 7.70644 4.8058e-06 11.5218 4.8058e-06 15.5C-0.0023954 18.4992 0.894324 21.4302 2.57438 23.9146C4.25444 26.3991 6.64068 28.3228 9.425 29.4375Z" fill="#BD081C" /></g><defs><clipPath id="clip0_209_463"><rect y="0.5" width="30" height="30" rx="15" fill="white" /></clipPath></defs></svg>
-    <h2 id="cc_downloader_text"> Enable Pinterest<br>Board Downloader</h2>
+    <svg style="display:block;flex-shrink:0;" width="14" height="14" viewBox="0 0 12 13" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip_launcher)"><rect y="0.5" width="12" height="12" rx="6" fill="#E9E9E9"/><path d="M3.77 12.075C3.70334 11.3917 3.74667 10.7367 3.9 10.11L4.5 7.52C4.38997 7.18576 4.33097 6.83684 4.325 6.485C4.325 5.645 4.73 5.045 5.37 5.045C5.81 5.045 6.135 5.355 6.135 5.945C6.135 6.135 6.09667 6.34833 6.02 6.585L5.76 7.445C5.71 7.61167 5.685 7.765 5.685 7.905C5.685 8.505 6.14 8.84 6.725 8.84C7.77 8.84 8.51 7.76 8.51 6.36C8.51 4.8 7.49 3.8 5.985 3.8C4.305 3.8 3.24 4.895 3.24 6.42C3.24 7.03 3.43 7.6 3.795 7.99C3.675 8.195 3.545 8.23 3.355 8.23C2.755 8.23 2.185 7.385 2.185 6.23C2.185 4.23 3.785 2.645 6.025 2.645C8.375 2.645 9.855 4.29 9.855 6.31C9.855 8.33 8.415 9.885 6.865 9.885C6.57003 9.88889 6.27821 9.82405 6.01265 9.69561C5.74709 9.56717 5.51508 9.37865 5.335 9.145L5.025 10.395C4.86976 11.0511 4.5952 11.6732 4.215 12.23C5.11334 12.5122 6.06554 12.5786 6.99435 12.4239C7.92316 12.2691 8.8024 11.8976 9.56075 11.3394C10.3191 10.7813 10.9352 10.0522 11.359 9.21135C11.7828 8.37051 12.0024 7.44161 12 6.5C12 4.9087 11.3679 3.38258 10.2426 2.25736C9.11742 1.13214 7.5913 0.5 6 0.5C4.4087 0.5 2.88258 1.13214 1.75736 2.25736C0.632143 3.38258 1.92232e-06 4.9087 1.92232e-06 6.5C-0.00095816 7.69967 0.35773 8.87208 1.02975 9.86585C1.70177 10.8596 2.65627 11.6291 3.77 12.075Z" fill="#BD081C"/></g><defs><clipPath id="clip_launcher"><rect y="0.5" width="12" height="12" rx="6" fill="white"/></clipPath></defs></svg>
+    <h2>Enable Pinterest Board Downloader</h2>
 </div>`);
     downloader_button.addEventListener('click', initialize_full_ui);
     document.body.appendChild(downloader_button);
@@ -222,77 +211,251 @@ function initialize_full_ui() {
 
     let full_ui_wrapper_elem = html_to_element(`<div id="cc_full_ui_wrapper">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
-        div#cc_full_ui_wrapper *, div#cc_full_ui_wrapper *::before, div#cc_full_ui_wrapper *::after { box-sizing: border-box; margin: 0; padding: 0; transition: all 250ms ease-in-out; user-select: none; }
-        div#cc_full_ui_wrapper { background-color: var(--cc_bg_main); border: 1px solid var(--cc_border); block-size: auto; bottom: 1.5rem !important; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15); color: var(--cc_fg_main); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: var(--cc_fz_12px); inline-size: clamp(320px, 90vw, 480px); left: calc(72px + 0.8rem) !important; overflow: hidden; position: fixed !important; z-index: 999999; }
-        div#cc_full_ui_wrapper a:hover, div#cc_full_ui_wrapper #cc_select_all_visible_pins_elem:hover { filter: brightness(0.9); }
-        div#cc_full_ui_wrapper a:active, div#cc_full_ui_wrapper #cc_select_all_visible_pins_elem:active { transform: scale(0.98); }
-        div#cc_full_ui_wrapper #cc_section_1 { padding: 1.5rem; }
-        div#cc_full_ui_wrapper header#branding { align-items: center; display: flex; gap: 0.5rem; }
-        div#cc_full_ui_wrapper #cc_pinterest_icon { height: var(--cc_fz_16px); width: var(--cc_fz_16px); }
-        div#cc_full_ui_wrapper #cc_branding_name { color: var(--cc_fg_main); font-size: var(--cc_fz_16px); }
-        div#cc_full_ui_wrapper #cc_manual { color: var(--cc_fg_sec); line-height: 1.5; margin-block-start: 1rem; }
-        div#cc_full_ui_wrapper #cc_controls_wrapper { align-items: center; display: flex; gap: 1rem; justify-content: space-around; margin-block-start: 1.5rem; }
-        div#cc_full_ui_wrapper .cc_single_control_wrapper { align-items: center; display: flex; flex: 1; flex-direction: column; font-size: var(--cc_fz_9px); text-align: center; }
-        div#cc_full_ui_wrapper .cc_count_display { color: var(--cc_fg_main); font-size: var(--cc_fz_40px); }
-        div#cc_full_ui_wrapper .cc_download_btn { color: var(--cc_accent_1) !important; cursor: pointer; font-weight: bold; margin-block-start: 0.5rem; text-decoration: none; }
-        div#cc_full_ui_wrapper .cc_download_btn:hover { color: var(--cc_accent_2) !important; }
-        div#cc_full_ui_wrapper #cc_select_all_visible_pins_elem { color: var(--cc_accent_1); cursor: pointer; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: var(--cc_fz_24px); font-weight: 500; text-align: center; }
-        div#cc_full_ui_wrapper #cc_select_all_visible_pins_elem:hover { color: var(--cc_accent_2); }
-        div#cc_full_ui_wrapper .cc_v_separator { background-color: var(--cc_border); block-size: 3rem; inline-size: 1px; }
-        div#cc_full_ui_wrapper #cc_section_2 { background-color: #F8F9FA; border-block-start: 1px solid var(--cc_border); display: flex; justify-content: center; padding: 1rem 1.5rem; }
-        div#cc_full_ui_wrapper #cc_log_wrapper { display: flex; flex-direction: column; gap: 0.5rem; inline-size: 100%; }
-        div#cc_full_ui_wrapper #cc_log_wrapper p { color: var(--cc_fg_sec); }
-        div#cc_full_ui_wrapper #cc_progress_log_elem { -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: var(--cc_fg_main); display: -webkit-box; font-size: var(--cc_fz_16px); line-height: 1.4; min-height: 2.8em; overflow: hidden; text-overflow: ellipsis; }
-        div#cc_full_ui_wrapper #cc_close_btn { color: var(--cc_fg_sec); cursor: pointer; height: 1.5rem; position: absolute; right: 1rem; top: 1rem; width: 1.5rem; }
-        div#cc_full_ui_wrapper #cc_close_btn:hover { color: var(--cc_error); }
-        div#cc_full_ui_wrapper #cc_close_btn:active { transform: scale(0.9); }
-        div#cc_full_ui_wrapper #cc_progress_log_elem.cc_countdown { animation: pulse 1s ease-in-out infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
-        .cc_log { color: var(--cc_fg_main) !important; } .cc_warning { color: var(--cc_warning) !important; } .cc_error { color: var(--cc_error) !important; } .cc_success { color: var(--cc_success) !important; } .cc_visible { visibility: visible !important; } .cc_hidden { visibility: hidden !important; }
-        div#cc_full_ui_wrapper footer#cc_section_3 { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 1.5rem; inline-size: 100%; font-size: var(--cc_fz_9px); line-height: 1; border-block-start: 1px solid var(--cc_border); background-color: #F8F9FA; }
-        div#cc_full_ui_wrapper footer#cc_section_3 a { line-height: inherit; font-weight: bold; cursor: pointer; color: var(--cc_fg_sec); }
-        div#cc_full_ui_wrapper footer#cc_section_3 a:hover { color: var(--cc_fg_main); }
-        div#cc_full_ui_wrapper #cc_history_controls { display: flex; gap: 1rem; align-items: center; }
-        div#cc_full_ui_wrapper #cc_minimize_btn { color: var(--cc_fg_sec); cursor: pointer; height: 1.5rem; position: absolute; right: 3rem; top: 1rem; width: 1.5rem; }
-        div#cc_full_ui_wrapper #cc_minimize_btn:hover { color: var(--cc_fg_main); }
-        div#cc_full_ui_wrapper #cc_minimize_btn:active { transform: scale(0.9); }
-        div#cc_full_ui_wrapper.cc_minimized #cc_section_1 > *:not(#cc_controls_wrapper) { display: none; }
-        div#cc_full_ui_wrapper.cc_minimized #cc_section_2, div#cc_full_ui_wrapper.cc_minimized #cc_section_3 { display: none; }
-        div#cc_full_ui_wrapper.cc_minimized #cc_section_1 { padding-block: 1rem; cursor: pointer; }
-        div#cc_full_ui_wrapper.cc_minimized #cc_controls_wrapper { margin-block-start: 0; }
-        div#cc_full_ui_wrapper.cc_minimized #cc_minimize_btn { display: none; }
-        div#cc_full_ui_wrapper.cc_minimized #cc_close_btn { display: none; }
-        
-        /* Endless Mode Styles */
-        a#cc_endless_btn { color: var(--cc_accent_1) !important; transition: color 0.2s; }
-        a#cc_endless_btn:hover { color: var(--cc_accent_2) !important; }
-        a#cc_endless_btn[data-active="true"] { color: #FFFFFF !important; background-color: var(--cc_error); padding: 4px 8px; border-radius: 4px; }
-        a#cc_endless_btn[data-active="true"]:hover { background-color: #bd2130; }
-
-        @media (max-width: 768px) {
-            div#cc_full_ui_wrapper { left: 50% !important; transform: translateX(-50%); width: 90vw !important; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+        div#cc_full_ui_wrapper, div#cc_full_ui_wrapper *, div#cc_full_ui_wrapper *::before, div#cc_full_ui_wrapper *::after { box-sizing: border-box; margin: 0; padding: 0; transition: all 200ms ease-in-out; user-select: none; }
+        div#cc_full_ui_wrapper {
+            background: rgba(235, 235, 235, 0.6);
+            backdrop-filter: blur(60px) saturate(200%) brightness(1.1);
+            -webkit-backdrop-filter: blur(60px) saturate(200%) brightness(1.1);
+            border: 1px solid var(--cc_fg_tert);
+            box-shadow: 0 -8px 32px rgba(0,0,0,0.12);
+            color: transparent;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 13px; font-weight: 500;
+            width: 480px !important;
+            max-width: 90vw;
+            inline-size: unset;
+            position: fixed !important; bottom: 0 !important;
+            left: 50% !important; transform: translateX(-50%);
+            border-radius: 16px 16px 0 0; overflow: hidden; z-index: 999999;
         }
-        @media (max-width: 420px) { div#cc_full_ui_wrapper #cc_controls_wrapper { flex-direction: column; align-items: stretch; gap: 1.5rem; } div#cc_full_ui_wrapper .cc_v_separator { display: none; } }
+        div#cc_full_ui_wrapper::before {
+            content: '';
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23g)'/%3E%3C/svg%3E");
+            background-size: 300px 300px;
+            background-repeat: repeat;
+            opacity: 0.55;
+            pointer-events: none;
+            z-index: 0;
+            mix-blend-mode: soft-light;
+        }
+        div#cc_full_ui_wrapper > * { position: relative; z-index: 1; }
+        div#cc_full_ui_wrapper a { cursor: pointer; text-decoration: none; }
+        div#cc_full_ui_wrapper a:hover { filter: brightness(0.8); }
+        div#cc_full_ui_wrapper a:active { transform: scale(0.97); }
+
+        /* HEADER */
+        div#cc_full_ui_wrapper #cc_header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 16px; border-bottom: 1px solid rgba(0,0,0,0.08);
+            cursor: pointer;
+        }
+        div#cc_full_ui_wrapper #cc_branding { display: flex; align-items: center; gap: 8px; }
+        div#cc_full_ui_wrapper #cc_branding_name { font-size: 13px; font-weight: 600; color: var(--cc_fg_main); }
+        div#cc_full_ui_wrapper #cc_header_controls { display: flex; align-items: center; gap: 12px; }
+        div#cc_full_ui_wrapper #cc_minimize_btn, div#cc_full_ui_wrapper #cc_close_btn {
+            color: var(--cc_fg_tert); cursor: pointer; width: 16px; height: 16px; flex-shrink: 0;
+        }
+
+        div#cc_full_ui_wrapper #cc_minimize_btn:hover { color: var(--cc_fg_main); }
+        div#cc_full_ui_wrapper #cc_close_btn:hover { color: var(--cc_error); }
+
+        /* CONTROLS */
+        div#cc_full_ui_wrapper #cc_controls_wrapper {
+            display: flex; align-items: center; justify-content: space-around;
+            padding: 14px 16px; gap: 8px;
+        }
+        div#cc_full_ui_wrapper .cc_single_control_wrapper {
+            display: flex; flex: 1; flex-direction: column; align-items: center; text-align: center;
+        }
+        div#cc_full_ui_wrapper .cc_count_display {
+            font-size: 28px; font-weight: 600; color: var(--cc_fg_main); line-height: 1;
+        }
+        div#cc_full_ui_wrapper .cc_count_label {
+            font-size: 10px; font-weight: 600; color: var(--cc_fg_sec); margin-top: 3px; letter-spacing: 0.02em;
+        }
+        div#cc_full_ui_wrapper .cc_download_btn {
+            font-size: 11px; font-weight: 600; color: var(--cc_accent_1) !important;
+            margin-top: 5px; display: block;
+        }
+        div#cc_full_ui_wrapper #cc_select_all_visible_pins_elem {
+            font-size: 13px; font-weight: 600; color: var(--cc_accent_1); cursor: pointer;
+        }
+        div#cc_full_ui_wrapper .cc_v_separator {
+            background-color: rgba(0,0,0,0.08); block-size: 40px; inline-size: 1px; flex-shrink: 0;
+        }
+
+        /* LOG */
+        div#cc_full_ui_wrapper #cc_section_2 {
+            background: rgba(0,0,0,0.04);
+            border-top: 1px solid rgba(0,0,0,0.08);
+            padding: 8px 16px;
+        }
+        div#cc_full_ui_wrapper #cc_progress_log_elem {
+            font-size: 11px; font-weight: 600; color: var(--cc_fg_sec); line-height: 1.4;
+            -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+            display: -webkit-box; overflow: hidden; text-overflow: ellipsis; min-height: 1.4em;
+        }
+
+        /* FOOTER */
+        div#cc_full_ui_wrapper #cc_section_3 {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 7px 16px; border-top: 1px solid rgba(0,0,0,0.08);
+            background: rgba(0,0,0,0.04);
+        }
+        div#cc_full_ui_wrapper #cc_section_3 a {
+            font-size: 10px; font-weight: 500; color: var(--cc_fg_sec);
+        }
+        div#cc_full_ui_wrapper #cc_section_3 a:hover { color: var(--cc_fg_main); }
+        div#cc_full_ui_wrapper #cc_history_controls { display: flex; gap: 12px; align-items: center; }
+        div#cc_full_ui_wrapper #cc_stateful_btn[data-stateful="false"] { color: var(--cc_fg_tert) !important; }
+
+        /* ENDLESS */
+        a#cc_endless_btn { color: var(--cc_fg_sec) !important; }
+        a#cc_endless_btn[data-active="true"] {
+            color: #fff !important; background-color: var(--cc_error);
+            padding: 2px 7px; border-radius: 4px;
+        }
+
+        /* LOG COLORS */
+        .cc_log { color: var(--cc_fg_main) !important; }
+        .cc_warning { color: var(--cc_warning) !important; }
+        .cc_error { color: var(--cc_error) !important; }
+        .cc_success { color: var(--cc_success) !important; }
+        .cc_visible { visibility: visible !important; }
+        .cc_hidden { visibility: hidden !important; }
+        div#cc_full_ui_wrapper #cc_progress_log_elem.cc_countdown { animation: pulse 1s ease-in-out infinite; }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+
+        /* MINIMIZED */
+        div#cc_full_ui_wrapper.cc_minimized #cc_header { border-bottom: none; cursor: pointer; }
+        div#cc_full_ui_wrapper.cc_minimized #cc_controls_wrapper,
+        div#cc_full_ui_wrapper.cc_minimized #cc_section_2,
+        div#cc_full_ui_wrapper.cc_minimized #cc_section_3 { display: none; }
+        div#cc_full_ui_wrapper.cc_minimized { border-radius: 12px 12px 0 0; }
+        div#cc_full_ui_wrapper.cc_minimized #cc_minimize_btn { display: none; }
+        div#cc_full_ui_wrapper.cc_minimized #cc_branding_name { display: none; }
+        div#cc_full_ui_wrapper #cc_minimized_summary { font-size: 12px; font-weight: 600; color: var(--cc_fg_main); display: none; }
+
+        @media (max-width: 520px) {
+            div#cc_full_ui_wrapper { inline-size: 100vw; border-radius: 12px 12px 0 0; }
+        }
+
+        /* HELP TOOLTIP */
+        #cc_help_btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 15px; height: 15px; border-radius: 50%;
+            background: rgba(0,0,0,0.10); color: var(--cc_fg_tert);
+            font-size: 9px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+            font-family: 'Inter', sans-serif; line-height: 1;
+            border: none; outline: none;
+            transition: background 150ms ease, color 150ms ease;
+        }
+        #cc_help_btn:hover { background: var(--cc_accent_1); color: #fff; }
+        #cc_help_tooltip {
+            position: fixed;
+            background: rgba(250, 250, 250, 0.96);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            color: var(--cc_fg_main);
+            border: 1px solid var(--cc_border);
+            border-radius: 10px;
+            padding: 11px 13px;
+            width: 226px;
+            font-size: 11px;
+            font-weight: 400;
+            line-height: 1.55;
+            pointer-events: none;
+            z-index: 9999999;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+            opacity: 0;
+            transform-origin: bottom center;
+        }
+        #cc_help_tooltip::before {
+            content: '';
+            position: absolute;
+            top: 100%; left: 44.5%; transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: var(--cc_border);
+        }
+        #cc_help_tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%; left: 44.5%; transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: rgba(250, 250, 250, 0.96);
+            margin-top: -1px;
+        }
+        #cc_help_tooltip .cc_tip_title {
+            font-size: 11px; font-weight: 600; color: var(--cc_fg_main);
+            margin-bottom: 7px; display: block;
+        }
+        #cc_help_tooltip .cc_tip_row {
+            display: flex; align-items: flex-start; gap: 7px; margin-bottom: 5px;
+        }
+        #cc_help_tooltip .cc_tip_row:last-child { margin-bottom: 0; }
+        #cc_help_tooltip .cc_tip_icon { flex-shrink: 0; font-size: 12px; line-height: 1.55; }
+        #cc_help_tooltip .cc_tip_copy { color: var(--cc_fg_sec); }
+        #cc_help_tooltip .cc_tip_copy strong { color: var(--cc_fg_main); font-weight: 600; }
+        #cc_help_tooltip kbd {
+            display: inline-block;
+            font-family: 'Inter', monospace;
+            font-size: 9px; font-weight: 600;
+            background: rgba(0, 0, 0, 0.04);
+            border: 1px solid var(--cc_border);
+            border-radius: 3px;
+            padding: 1px 4px;
+            color: var(--cc_fg_main);
+            vertical-align: 1px;
+            line-height: 1.4;
+        }
     </style>
-    <svg id="cc_minimize_btn" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M8 12H16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    <svg id="cc_close_btn" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.5 7.5L13.5 13.5M13.5 7.5L7.5 13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
-    <section id="cc_section_1">
-        <header id="branding"><svg id="cc_pinterest_icon" viewBox="0 0 12 13" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_214_217)"><rect y="0.5" width="12" height="12" rx="6" fill="#E9E9E9" /><path d="M3.77 12.075C3.70334 11.3917 3.74667 10.7367 3.9 10.11L4.5 7.52C4.38997 7.18576 4.33097 6.83684 4.325 6.485C4.325 5.645 4.73 5.045 5.37 5.045C5.81 5.045 6.135 5.355 6.135 5.945C6.135 6.135 6.09667 6.34833 6.02 6.585L5.76 7.445C5.71 7.61167 5.685 7.765 5.685 7.905C5.685 8.505 6.14 8.84 6.725 8.84C7.77 8.84 8.51 7.76 8.51 6.36C8.51 4.8 7.49 3.8 5.985 3.8C4.305 3.8 3.24 4.895 3.24 6.42C3.24 7.03 3.43 7.6 3.795 7.99C3.675 8.195 3.545 8.23 3.355 8.23C2.755 8.23 2.185 7.385 2.185 6.23C2.185 4.23 3.785 2.645 6.025 2.645C8.375 2.645 9.855 4.29 9.855 6.31C9.855 8.33 8.415 9.885 6.865 9.885C6.57003 9.88889 6.27821 9.82405 6.01265 9.69561C5.74709 9.56717 5.51508 9.37865 5.335 9.145L5.025 10.395C4.86976 11.0511 4.5952 11.6732 4.215 12.23C5.11334 12.5122 6.06554 12.5786 6.99435 12.4239C7.92316 12.2691 8.8024 11.8976 9.56075 11.3394C10.3191 10.7813 10.9352 10.0522 11.359 9.21135C11.7828 8.37051 12.0024 7.44161 12 6.5C12 4.9087 11.3679 3.38258 10.2426 2.25736C9.11742 1.13214 7.5913 0.5 6 0.5C4.4087 0.5 2.88258 1.13214 1.75736 2.25736C0.632143 3.38258 1.92232e-06 4.9087 1.92232e-06 6.5C-0.00095816 7.69967 0.35773 8.87208 1.02975 9.86585C1.70177 10.8596 2.65627 11.6291 3.77 12.075Z" fill="#BD081C" /></g><defs><clipPath id="clip0_214_217"><rect y="0.5" width="12" height="12" rx="6" fill="white" /></clipPath></defs></svg><h1 id="cc_branding_name">Pinterest Board Downloader</h1></header>
-        <p id="cc_manual"><b>Shift + Right Click</b> to select a single pin. <b>Shift + Right Drag</b> to marquee select pins (hold Alt to unselect). Avoid closing the tab or opening pins while downloading.</p>
-        <div id="cc_controls_wrapper"><div id="cc_selected_pins_wrapper" class="cc_single_control_wrapper"><h1 id="cc_currently_selected_pins_count_elem" class="cc_count_display">0</h1><p>Selected Pins</p><a id="cc_download_selected_pins_elem" class="cc_download_btn">Download</a></div><div class="cc_v_separator"></div><div id="cc_board_count_wrapper" class="cc_single_control_wrapper"><h1 id="cc_current_board_count_elem" class="cc_count_display">N/A</h1><p>Pins on Board</p><a id="cc_download_all_pins_elem" class="cc_download_btn">Download All</a></div><div class="cc_v_separator"></div><div id="cc_select_all_visible_pins_wrapper" class="cc_single_control_wrapper"><h1 id="cc_select_all_visible_pins_elem">Select Visible</h1></div></div>
+
+    <div id="cc_header">
+        <div id="cc_branding">
+            <svg style="display:block;flex-shrink:0;" width="14" height="14" viewBox="0 0 12 13" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip_ui)"><rect y="0.5" width="12" height="12" rx="6" fill="#E9E9E9"/><path d="M3.77 12.075C3.70334 11.3917 3.74667 10.7367 3.9 10.11L4.5 7.52C4.38997 7.18576 4.33097 6.83684 4.325 6.485C4.325 5.645 4.73 5.045 5.37 5.045C5.81 5.045 6.135 5.355 6.135 5.945C6.135 6.135 6.09667 6.34833 6.02 6.585L5.76 7.445C5.71 7.61167 5.685 7.765 5.685 7.905C5.685 8.505 6.14 8.84 6.725 8.84C7.77 8.84 8.51 7.76 8.51 6.36C8.51 4.8 7.49 3.8 5.985 3.8C4.305 3.8 3.24 4.895 3.24 6.42C3.24 7.03 3.43 7.6 3.795 7.99C3.675 8.195 3.545 8.23 3.355 8.23C2.755 8.23 2.185 7.385 2.185 6.23C2.185 4.23 3.785 2.645 6.025 2.645C8.375 2.645 9.855 4.29 9.855 6.31C9.855 8.33 8.415 9.885 6.865 9.885C6.57003 9.88889 6.27821 9.82405 6.01265 9.69561C5.74709 9.56717 5.51508 9.37865 5.335 9.145L5.025 10.395C4.86976 11.0511 4.5952 11.6732 4.215 12.23C5.11334 12.5122 6.06554 12.5786 6.99435 12.4239C7.92316 12.2691 8.8024 11.8976 9.56075 11.3394C10.3191 10.7813 10.9352 10.0522 11.359 9.21135C11.7828 8.37051 12.0024 7.44161 12 6.5C12 4.9087 11.3679 3.38258 10.2426 2.25736C9.11742 1.13214 7.5913 0.5 6 0.5C4.4087 0.5 2.88258 1.13214 1.75736 2.25736C0.632143 3.38258 1.92232e-06 4.9087 1.92232e-06 6.5C-0.00095816 7.69967 0.35773 8.87208 1.02975 9.86585C1.70177 10.8596 2.65627 11.6291 3.77 12.075Z" fill="#BD081C"/></g><defs><clipPath id="clip_ui"><rect y="0.5" width="12" height="12" rx="6" fill="white"/></clipPath></defs></svg>
+            <span id="cc_branding_name">Board Downloader</span>
+            <span id="cc_minimized_summary">0 selected</span>
+        </div>
+        <div id="cc_header_controls">
+            <a id="cc_minimized_download" style="font-size:11px; font-weight:500; color:var(--cc_accent_1); display:none;">Download</a>
+            <a id="cc_minimized_select" style="font-size:11px; font-weight:500; color:var(--cc_accent_1); display:none;">Select Visible</a>
+            <button id="cc_help_btn" aria-label="How to use">?</button>
+            <svg id="cc_minimize_btn" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 12H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <svg id="cc_close_btn" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.5 7.5L13.5 13.5M13.5 7.5L7.5 13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+    </div>
+
+    <div id="cc_controls_wrapper">
+        <div id="cc_selected_pins_wrapper" class="cc_single_control_wrapper">
+            <h1 id="cc_currently_selected_pins_count_elem" class="cc_count_display">0</h1>
+            <p class="cc_count_label">Selected</p>
+            <a id="cc_download_selected_pins_elem" class="cc_download_btn">Download</a>
+        </div>
+        <div class="cc_v_separator"></div>
+        <div id="cc_board_count_wrapper" class="cc_single_control_wrapper">
+            <h1 id="cc_current_board_count_elem" class="cc_count_display">N/A</h1>
+            <p class="cc_count_label">On Board</p>
+            <a id="cc_download_all_pins_elem" class="cc_download_btn">Download All</a>
+        </div>
+        <div class="cc_v_separator"></div>
+        <div class="cc_single_control_wrapper">
+            <h1 id="cc_select_all_visible_pins_elem">Select<br>Visible</h1>
+        </div>
+    </div>
+
+    <section id="cc_section_2">
+        <h1 id="cc_progress_log_elem">No logs to view right now.</h1>
     </section>
-    <section id="cc_section_2"><div id="cc_log_wrapper"><p>Progress Log:</p><h1 id="cc_progress_log_elem">No logs to view right now.</h1></div></section>
-    
+
     <footer id="cc_section_3">
-        <a id="cc_stateful_btn" data-stateful="true" role="button">Remember Pins (Enabled)</a>
+        <a id="cc_stateful_btn" data-stateful="true" role="button">Remember Pins (on)</a>
         <div id="cc_history_controls">
-            <a id="cc_endless_btn" role="button">Endless Mode</a>
+            <a id="cc_endless_btn" role="button">Endless</a>
             <a id="cc_import_btn" role="button">Import</a>
             <a id="cc_export_btn" role="button">Export</a>
-            <a id="cc_clear_history_btn" role="button">Clear History</a>
+            <a id="cc_clear_history_btn" role="button">Clear</a>
         </div>
     </footer>
 </div>`);
@@ -335,9 +498,41 @@ function initialize_full_ui() {
     document.addEventListener('mousemove', handle_marquee_move);
     document.addEventListener('mouseup', handle_marquee_end);
 
+    // Cleans up the marquee box if the mouse leaves the browser window mid-drag
+    document.addEventListener('mouseleave', cleanup_marquee);
+
+    // Escape key bails out of an active marquee drag without selecting anything
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && is_marquee_selecting) cleanup_marquee();
+    });
+
+    document.addEventListener('contextmenu', handle_marquee_end_on_contextmenu);
+
     document.body.style.userSelect = 'none';
-    DOM.downloader_button.self.classList.add('cc_hidden');
+    DOM.downloader_button.self.style.display = 'none';
+
+    // Set initial state before appending so there's no flash
+    full_ui_wrapper_elem.style.opacity = '0';
+    full_ui_wrapper_elem.style.transform = 'translateX(-50%) translateY(100%)';
     document.body.appendChild(full_ui_wrapper_elem);
+
+    // Animate open: slide up + fade in
+    if (window.gsap) {
+        gsap.to(full_ui_wrapper_elem, {
+            opacity: 1,
+            y: 0,
+            duration: 0.45,
+            ease: 'power3.out',
+            clearProps: 'y,opacity',
+            onComplete: () => {
+                // Restore the CSS transform so layout stays correct after GSAP clears its props
+                full_ui_wrapper_elem.style.transform = 'translateX(-50%)';
+            }
+        });
+    } else {
+        full_ui_wrapper_elem.style.opacity = '1';
+        full_ui_wrapper_elem.style.transform = 'translateX(-50%)';
+    }
 
     const state_control_btn = full_ui_wrapper_elem.querySelector('#cc_stateful_btn');
     const import_btn = full_ui_wrapper_elem.querySelector('#cc_import_btn');
@@ -345,19 +540,171 @@ function initialize_full_ui() {
     const clear_history_btn = full_ui_wrapper_elem.querySelector('#cc_clear_history_btn');
     const endless_btn = full_ui_wrapper_elem.querySelector('#cc_endless_btn');
     const minimize_btn = full_ui_wrapper_elem.querySelector('#cc_minimize_btn');
-    const section1 = full_ui_wrapper_elem.querySelector('#cc_section_1');
+
+    // --- HELP TOOLTIP ---
+    const help_btn = full_ui_wrapper_elem.querySelector('#cc_help_btn');
+    const tooltip = document.createElement('div');
+    tooltip.id = 'cc_help_tooltip';
+    tooltip.innerHTML = `
+        <span class="cc_tip_title">How to use</span>
+        <div class="cc_tip_row">
+            <span class="cc_tip_icon">🖱️</span>
+            <span class="cc_tip_copy"><strong>Select a pin</strong> — <kbd>Shift</kbd> + right-click any pin to select or deselect it.</span>
+        </div>
+        <div class="cc_tip_row">
+            <span class="cc_tip_icon">⬜</span>
+            <span class="cc_tip_copy"><strong>Marquee select</strong> — <kbd>Shift</kbd> + right-drag to draw a box around multiple pins at once.</span>
+        </div>
+        <div class="cc_tip_row">
+            <span class="cc_tip_icon">⬇️</span>
+            <span class="cc_tip_copy"><strong>Download All</strong> — auto-scrolls the entire board, finds every pin, then downloads the lot.</span>
+        </div>`;
+    document.body.appendChild(tooltip);
+
+    let tooltip_tween = null;
+    function position_tooltip() {
+        const rect = help_btn.getBoundingClientRect();
+        const tt_w = 226;
+        let left = rect.left + rect.width / 2 - tt_w / 2;
+        // clamp to viewport
+        left = Math.max(8, Math.min(left, window.innerWidth - tt_w - 8));
+        tooltip.style.left = left + 'px';
+        tooltip.style.top = (rect.top - 8) + 'px'; // will be shifted up by transform
+        tooltip.style.transform = 'translateY(-100%) scale(1)';
+    }
+
+    help_btn.addEventListener('mouseenter', () => {
+        position_tooltip();
+        if (tooltip_tween) tooltip_tween.kill();
+        if (window.gsap) {
+            gsap.set(tooltip, { display: 'block' });
+            tooltip_tween = gsap.fromTo(tooltip,
+                { opacity: 0, y: 6, scale: 0.95 },
+                { opacity: 1, y: 0, scale: 1, duration: 0.22, ease: 'power2.out' }
+            );
+        } else {
+            tooltip.style.display = 'block';
+            tooltip.style.opacity = '1';
+        }
+    });
+
+    help_btn.addEventListener('mouseleave', () => {
+        if (tooltip_tween) tooltip_tween.kill();
+        if (window.gsap) {
+            tooltip_tween = gsap.to(tooltip, {
+                opacity: 0, y: 4, scale: 0.95, duration: 0.16, ease: 'power2.in',
+                onComplete: () => { gsap.set(tooltip, { display: 'none' }); }
+            });
+        } else {
+            tooltip.style.display = 'none';
+            tooltip.style.opacity = '0';
+        }
+    });
+
+    // Hide tooltip if UI is closed/minimized
+    help_btn.addEventListener('click', e => e.stopPropagation());
+    // --- END HELP TOOLTIP ---
+
+    // Restore minimized state on launch
+    if (localStorage.getItem('pbdl_ui_minimized') === 'true') {
+        full_ui_wrapper_elem.classList.add('cc_minimized');
+        full_ui_wrapper_elem.querySelector('#cc_minimized_summary').style.display = 'block';
+        full_ui_wrapper_elem.querySelector('#cc_minimized_download').style.display = 'block';
+        full_ui_wrapper_elem.querySelector('#cc_minimized_select').style.display = 'block';
+        sync_minimized_summary();
+    }
 
     minimize_btn.addEventListener('click', (event) => {
         event.stopPropagation();
-        full_ui_wrapper_elem.classList.add('cc_minimized');
+        if (full_ui_wrapper_elem.classList.contains('cc_minimized')) return;
+
+        const controls = full_ui_wrapper_elem.querySelector('#cc_controls_wrapper');
+        const sec2 = full_ui_wrapper_elem.querySelector('#cc_section_2');
+        const sec3 = full_ui_wrapper_elem.querySelector('#cc_section_3');
+        const summaryEl = full_ui_wrapper_elem.querySelector('#cc_minimized_summary');
+        const dlBtn = full_ui_wrapper_elem.querySelector('#cc_minimized_download');
+        const selBtn = full_ui_wrapper_elem.querySelector('#cc_minimized_select');
+
+        if (window.gsap) {
+            gsap.to([controls, sec2, sec3], {
+                opacity: 0, duration: 0.18, ease: 'power2.in',
+                onComplete: () => {
+                    full_ui_wrapper_elem.classList.add('cc_minimized');
+                    summaryEl.style.display = 'block';
+                    dlBtn.style.display = 'block';
+                    selBtn.style.display = 'block';
+                    sync_minimized_summary();
+                    gsap.fromTo([summaryEl, dlBtn, selBtn],
+                        { opacity: 0, y: 4 },
+                        { opacity: 1, y: 0, duration: 0.22, ease: 'power2.out', stagger: 0.04 }
+                    );
+                }
+            });
+        } else {
+            full_ui_wrapper_elem.classList.add('cc_minimized');
+            summaryEl.style.display = 'block';
+            dlBtn.style.display = 'block';
+            selBtn.style.display = 'block';
+            sync_minimized_summary();
+        }
+        localStorage.setItem('pbdl_ui_minimized', 'true');
     });
 
-    section1.addEventListener('click', (event) => {
+    full_ui_wrapper_elem.querySelector('#cc_header').addEventListener('click', (event) => {
+        if (event.target.closest('#cc_minimized_download, #cc_minimized_select, #cc_close_btn, #cc_minimize_btn')) return;
         if (full_ui_wrapper_elem.classList.contains('cc_minimized')) {
-            if (event.target.closest('.cc_single_control_wrapper a, .cc_single_control_wrapper h1')) {
-                return;
-            }
+            // EXPAND
+            const summaryEl = full_ui_wrapper_elem.querySelector('#cc_minimized_summary');
+            const dlBtn = full_ui_wrapper_elem.querySelector('#cc_minimized_download');
+            const selBtn = full_ui_wrapper_elem.querySelector('#cc_minimized_select');
+
             full_ui_wrapper_elem.classList.remove('cc_minimized');
+            summaryEl.style.display = 'none';
+            dlBtn.style.display = 'none';
+            selBtn.style.display = 'none';
+
+            if (window.gsap) {
+                const controls = full_ui_wrapper_elem.querySelector('#cc_controls_wrapper');
+                const sec2 = full_ui_wrapper_elem.querySelector('#cc_section_2');
+                const sec3 = full_ui_wrapper_elem.querySelector('#cc_section_3');
+                gsap.fromTo([controls, sec2, sec3],
+                    { opacity: 0, y: 8 },
+                    { opacity: 1, y: 0, duration: 0.3, ease: 'power3.out', stagger: 0.05 }
+                );
+            }
+            localStorage.setItem('pbdl_ui_minimized', 'false');
+        } else {
+            // MINIMIZE
+            const controls = full_ui_wrapper_elem.querySelector('#cc_controls_wrapper');
+            const sec2 = full_ui_wrapper_elem.querySelector('#cc_section_2');
+            const sec3 = full_ui_wrapper_elem.querySelector('#cc_section_3');
+            const summaryEl = full_ui_wrapper_elem.querySelector('#cc_minimized_summary');
+            const dlBtn = full_ui_wrapper_elem.querySelector('#cc_minimized_download');
+            const selBtn = full_ui_wrapper_elem.querySelector('#cc_minimized_select');
+
+            if (window.gsap) {
+                gsap.to([controls, sec2, sec3], {
+                    opacity: 0, duration: 0.18, ease: 'power2.in',
+                    onComplete: () => {
+                        full_ui_wrapper_elem.classList.add('cc_minimized');
+                        summaryEl.style.display = 'block';
+                        dlBtn.style.display = 'block';
+                        selBtn.style.display = 'block';
+                        sync_minimized_summary();
+                        gsap.fromTo([summaryEl, dlBtn, selBtn],
+                            { opacity: 0, y: 4 },
+                            { opacity: 1, y: 0, duration: 0.22, ease: 'power2.out', stagger: 0.04 }
+                        );
+                    }
+                });
+            } else {
+                full_ui_wrapper_elem.classList.add('cc_minimized');
+                summaryEl.style.display = 'block';
+                dlBtn.style.display = 'block';
+                selBtn.style.display = 'block';
+                sync_minimized_summary();
+            }
+            localStorage.setItem('pbdl_ui_minimized', 'true');
         }
     });
 
@@ -365,11 +712,11 @@ function initialize_full_ui() {
         stateful_mode = !stateful_mode;
         if (stateful_mode) {
             state_control_btn.dataset.stateful = "true";
-            state_control_btn.innerHTML = "Remember Pins (Enabled)";
+            state_control_btn.innerHTML = "Remember Pins (on)";
             logger('INFO', `"Remember Pins" is now ON.`);
         } else {
             state_control_btn.dataset.stateful = "false";
-            state_control_btn.innerHTML = "Remember Pins (Disabled)";
+            state_control_btn.innerHTML = "Remember Pins (off)";
             logger('INFO', `"Remember Pins" is now OFF.`);
         }
     });
@@ -378,7 +725,8 @@ function initialize_full_ui() {
     export_btn.addEventListener('click', export_history);
     clear_history_btn.addEventListener('click', clear_history);
     endless_btn.addEventListener('click', toggle_endless_mode);
-
+    full_ui_wrapper_elem.querySelector('#cc_minimized_download').addEventListener('click', initialize_downloads);
+    full_ui_wrapper_elem.querySelector('#cc_minimized_select').addEventListener('click', select_all_visible_pins);
     return;
 }
 
@@ -744,9 +1092,20 @@ async function handle_click(event) {
     }
 }
 
+function cleanup_marquee() {
+    // Nuclear cleanup — kills ALL stray marquee divs, not just the tracked one
+    document.querySelectorAll('#cc_marquee_overlay').forEach(el => el.remove());
+    if (marquee_div) { marquee_div.remove(); marquee_div = null; }
+    if (marquee_raf) { cancelAnimationFrame(marquee_raf); marquee_raf = null; }
+    is_marquee_selecting = false;
+}
+
 function handle_marquee_start(e) {
     if (e.shiftKey && e.button === 2) {
         if (DOM.full_ui_wrapper.self && DOM.full_ui_wrapper.self.contains(e.target)) return;
+
+        // Always nuke any leftover marquee before starting a fresh one
+        cleanup_marquee();
 
         is_marquee_selecting = true;
         did_marquee_drag = false;
@@ -755,21 +1114,19 @@ function handle_marquee_start(e) {
 
         marquee_div = document.createElement('div');
         marquee_div.id = 'cc_marquee_overlay';
-        marquee_div.style.position = 'fixed';
-        marquee_div.style.border = '1px solid var(--cc_accent_1)';
-        marquee_div.style.backgroundColor = 'var(--cc_bg_accent_2)';
-        marquee_div.style.zIndex = '999999';
-        marquee_div.style.pointerEvents = 'none';
-
-        // --- UPDATED PORTION ---
-        marquee_div.style.willChange = 'transform, width, height'; // Optimize performance
-        marquee_div.style.left = '0px';
-        marquee_div.style.top = '0px';
-        marquee_div.style.transform = `translate(${start_marquee_x}px, ${start_marquee_y}px)`;
-        // -----------------------
-
-        marquee_div.style.width = '0px';
-        marquee_div.style.height = '0px';
+        Object.assign(marquee_div.style, {
+            position: 'fixed',
+            border: '1px solid var(--cc_accent_1)',
+            backgroundColor: 'var(--cc_bg_accent_2)',
+            zIndex: '999999',
+            pointerEvents: 'none',
+            willChange: 'transform, width, height',
+            left: '0px',
+            top: '0px',
+            transform: `translate(${start_marquee_x}px, ${start_marquee_y}px)`,
+            width: '0px',
+            height: '0px',
+        });
 
         document.body.appendChild(marquee_div);
     }
@@ -805,64 +1162,59 @@ function handle_marquee_move(e) {
     }
 }
 
+function handle_marquee_end_on_contextmenu(e) {
+    if (is_marquee_selecting) {
+        handle_marquee_end(e);
+    }
+}
+
 function capture_marquee_click(e) {
     e.preventDefault();
     e.stopPropagation();
 }
 
 function handle_marquee_end(e) {
-    if (is_marquee_selecting) {
-        is_marquee_selecting = false;
+    if (!is_marquee_selecting) return;
 
-        if (marquee_raf) {
-            cancelAnimationFrame(marquee_raf);
-            marquee_raf = null;
-        }
+    // Snapshot rect before cleanup removes the element
+    let rect = marquee_div ? marquee_div.getBoundingClientRect() : null;
+    const was_drag = did_marquee_drag;
 
-        if (marquee_div) {
-            let rect = marquee_div.getBoundingClientRect();
-            marquee_div.remove();
-            marquee_div = null;
+    cleanup_marquee();
+    did_marquee_drag = false;
 
-            // Apply only if the selection drag box was sufficiently large
-            if (rect.width > 5 && rect.height > 5) {
-                // Prevent underlying link triggers right after drag completion
-                window.addEventListener('click', capture_marquee_click, { capture: true, once: true });
-                setTimeout(() => window.removeEventListener('click', capture_marquee_click, { capture: true }), 0);
+    if (rect && rect.width > 5 && rect.height > 5) {
+        window.addEventListener('click', capture_marquee_click, { capture: true, once: true });
+        setTimeout(() => window.removeEventListener('click', capture_marquee_click, { capture: true }), 0);
 
-                let pin_elements = document.querySelectorAll('[data-test-id="pin"]');
-                let pins_to_select = [];
-                let pins_to_unselect = [];
+        let pin_elements = document.querySelectorAll('[data-test-id="pin"]');
+        let pins_to_select = [];
+        let pins_to_unselect = [];
 
-                for (let pin of pin_elements) {
-                    let pin_rect = pin.getBoundingClientRect();
-                    let intersect = !(
-                        rect.right < pin_rect.left ||
-                        rect.left > pin_rect.right ||
-                        rect.bottom < pin_rect.top ||
-                        rect.top > pin_rect.bottom
-                    );
-                    if (intersect) {
-                        let link = pin.querySelector('a[href*="/pin/"]');
-                        if (link && link.href) {
-                            if (e.altKey) {
-                                pins_to_unselect.push(link.href);
-                            } else {
-                                pins_to_select.push(link.href);
-                            }
-                        }
-                    }
-                }
-
-                if (pins_to_select.length > 0) {
-                    logger('INFO', `Marquee selected ${pins_to_select.length} pins.`);
-                    select_pins(pins_to_select);
-                }
-                if (pins_to_unselect.length > 0) {
-                    logger('INFO', `Marquee unselected ${pins_to_unselect.length} pins.`);
-                    unselect_pins(pins_to_unselect);
+        for (let pin of pin_elements) {
+            let pin_rect = pin.getBoundingClientRect();
+            let intersect = !(
+                rect.right < pin_rect.left ||
+                rect.left > pin_rect.right ||
+                rect.bottom < pin_rect.top ||
+                rect.top > pin_rect.bottom
+            );
+            if (intersect) {
+                let link = pin.querySelector('a[href*="/pin/"]');
+                if (link && link.href) {
+                    if (e.altKey) pins_to_unselect.push(link.href);
+                    else pins_to_select.push(link.href);
                 }
             }
+        }
+
+        if (pins_to_select.length > 0) {
+            logger('INFO', `Marquee selected ${pins_to_select.length} pins.`);
+            select_pins(pins_to_select);
+        }
+        if (pins_to_unselect.length > 0) {
+            logger('INFO', `Marquee unselected ${pins_to_unselect.length} pins.`);
+            unselect_pins(pins_to_unselect);
         }
     }
 }
@@ -1205,7 +1557,6 @@ function inject_selected_overlay(parentElement, status = 'selected', random = fa
         boxShadow: `inset 0 0 0 clamp(5px, 0.6vw, 7px) ${borderColor}`,
         pointerEvents: 'none',
         opacity: '0',
-        transition: `opacity ${random ? (200 + Math.random() * 100) : 150}ms ease-in-out`,
     });
 
     let targetBorderRadius = window.getComputedStyle(parentElement).borderRadius;
@@ -1218,7 +1569,15 @@ function inject_selected_overlay(parentElement, status = 'selected', random = fa
     }
     newDiv.style.borderRadius = targetBorderRadius;
     parentElement.prepend(newDiv);
-    requestAnimationFrame(() => { newDiv.style.opacity = '1'; });
+
+    if (window.gsap) {
+        gsap.fromTo(newDiv,
+            { opacity: 0, scale: 0.94 },
+            { opacity: 1, scale: 1, duration: random ? (0.2 + Math.random() * 0.1) : 0.18, ease: 'power2.out' }
+        );
+    } else {
+        requestAnimationFrame(() => { newDiv.style.opacity = '1'; });
+    }
 }
 
 function get_pin_element_by_url(url) {
@@ -1311,8 +1670,42 @@ function update_currently_selected_pins() {
     else if (pin_count >= 1_000) formatted_pin_count = `${(pin_count / 1_000).toFixed(2)}k`;
     else formatted_pin_count = `${pin_count}`;
 
-    update_element_html(DOM.full_ui_wrapper.selected_pins_wrapper.currently_selected_pins_count_elem.self, formatted_pin_count);
+    const count_el = DOM.full_ui_wrapper.selected_pins_wrapper.currently_selected_pins_count_elem.self;
+    const prev_text = count_el ? count_el.textContent : '';
+
+    update_element_html(count_el, formatted_pin_count);
+
+    // Animate the counter only when the value actually changes
+    if (count_el && window.gsap && formatted_pin_count !== prev_text) {
+        gsap.fromTo(count_el,
+            { scale: 1.28, opacity: 0.6 },
+            { scale: 1, opacity: 1, duration: 0.32, ease: 'back.out(2.5)' }
+        );
+    }
+
     logger('DEBUG', `UI updated to show ${pin_count} selected pins.`);
+    sync_minimized_summary();
+}
+
+function sync_minimized_summary() {
+    const el = document.querySelector('#cc_minimized_summary');
+    if (!el) return;
+    const newText = `${selected_pins.size} selected`;
+    if (el.textContent === newText) return;
+    if (window.gsap) {
+        gsap.to(el, {
+            opacity: 0, y: -4, duration: 0.12, ease: 'power1.in',
+            onComplete: () => {
+                el.textContent = newText;
+                gsap.fromTo(el,
+                    { opacity: 0, y: 4 },
+                    { opacity: 1, y: 0, duration: 0.18, ease: 'power2.out' }
+                );
+            }
+        });
+    } else {
+        el.textContent = newText;
+    }
 }
 
 function unselect_pins(pin_urls, random = true) {
@@ -1329,10 +1722,18 @@ function unselect_pins(pin_urls, random = true) {
 
         let overlay = overlayHost.querySelector('[data-selected-overlay]');
         if (overlay) {
-            let duration = random ? (300 + Math.random() * 100) : 150;
-            overlay.style.transition = `opacity ${duration}ms ease-in-out`;
-            overlay.style.opacity = '0';
-            setTimeout(() => { overlay.remove(); }, duration);
+            if (window.gsap) {
+                let duration = random ? (0.28 + Math.random() * 0.1) : 0.18;
+                gsap.to(overlay, {
+                    opacity: 0, scale: 0.94, duration, ease: 'power2.in',
+                    onComplete: () => { if (overlay.parentNode) overlay.remove(); }
+                });
+            } else {
+                let duration_ms = random ? (300 + Math.random() * 100) : 150;
+                overlay.style.transition = `opacity ${duration_ms}ms ease-in-out`;
+                overlay.style.opacity = '0';
+                setTimeout(() => { overlay.remove(); }, duration_ms);
+            }
             removal_count++;
         }
     }
@@ -1373,6 +1774,8 @@ function parse_srcset(srcset, best_quality = true) {
 }
 
 async function download_pins(items) {
+    cancel_downloads = false;
+    logger('INFO', `cancel_downloads reset. Value is now: ${cancel_downloads}`);
     logger('INFO', `Starting download of ${items.length} files. This may take a moment...`);
     let failed_downloads = 0;
     let successful_downloads = 0;
@@ -1423,6 +1826,7 @@ async function download_pins(items) {
         const results = await Promise.all(promises);
         successful_downloads += results.filter(r => r).length;
         failed_downloads += results.filter(r => !r).length;
+        mark_visible_pins_only();
 
         const progress_percentage = Math.min(100, (((i + 1) * MAX_CONCURRENT_DOWNLOADS / items.length) * 100));
 
@@ -1438,8 +1842,6 @@ async function download_pins(items) {
     }
     return { failed_downloads, successful_downloads };
 }
-
-
 
 function check_if_board_page() {
     const url = window.location.href;
@@ -1524,7 +1926,7 @@ function handle_url_change() {
 
 function disable_board_features() {
     // Stop any ongoing operations
-    cancel_downloads = true;
+    if (observer_running) cancel_downloads = true;
     clearInterval(timeout_watcher_interval);
     clearInterval(auto_scroll_interval);
     observer?.disconnect();
@@ -1548,7 +1950,7 @@ function disable_board_features() {
 
 function refresh_ui_for_new_board() {
     // Stop any ongoing operations
-    cancel_downloads = true;
+    if (observer_running) cancel_downloads = true;
     clearInterval(timeout_watcher_interval);
     clearInterval(auto_scroll_interval);
     observer?.disconnect();
@@ -1640,6 +2042,8 @@ function close_full_ui() {
     document.removeEventListener('mousedown', handle_marquee_start);
     document.removeEventListener('mousemove', handle_marquee_move);
     document.removeEventListener('mouseup', handle_marquee_end);
+    document.removeEventListener('mouseleave', cleanup_marquee);
+    document.removeEventListener('contextmenu', handle_marquee_end_on_contextmenu);
 
     clearInterval(timeout_watcher_interval);
     clearInterval(auto_scroll_interval);
@@ -1656,11 +2060,29 @@ function close_full_ui() {
     selected_pins.clear();
     failed_pins.clear();
 
-    DOM.full_ui_wrapper.self.remove();
-    DOM.downloader_button.self.classList.remove('cc_hidden');
+    const ui_el = DOM.full_ui_wrapper.self;
+    const btn_el = DOM.downloader_button.self;
 
-    let downloader_button = DOM.downloader_button.self;
-    DOM = DOM_template;
-    DOM.downloader_button.self = downloader_button;
-    logger('INFO', 'Downloader UI is now closed.');
+    function finish_close() {
+        if (ui_el && ui_el.parentNode) ui_el.remove();
+        const tt = document.getElementById('cc_help_tooltip');
+        if (tt) tt.remove();
+        btn_el.style.display = '';
+        let downloader_button = btn_el;
+        DOM = DOM_template;
+        DOM.downloader_button.self = downloader_button;
+        logger('INFO', 'Downloader UI is now closed.');
+    }
+
+    if (window.gsap && ui_el) {
+        gsap.to(ui_el, {
+            opacity: 0,
+            y: 40,
+            duration: 0.35,
+            ease: 'power3.in',
+            onComplete: finish_close
+        });
+    } else {
+        finish_close();
+    }
 }
